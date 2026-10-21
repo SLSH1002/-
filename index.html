@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport"
  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+
 <title>像素冒險 Online</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -13,51 +14,104 @@
 <style>
 *{box-sizing:border-box}
 body{
- margin:0;background:#17231f;color:#fff;
- font-family:system-ui;text-align:center
+ margin:0;
+ background:#17231f;
+ color:#fff;
+ font-family:system-ui,sans-serif;
+ text-align:center
 }
-main{max-width:600px;margin:auto;padding:14px}
+main{
+ max-width:600px;
+ margin:auto;
+ padding:14px
+}
 h2{color:#a8f0a0}
 button,input{
- font-size:16px;padding:11px;border-radius:9px;
- border:0;margin:4px
+ font-size:16px;
+ padding:11px;
+ border-radius:9px;
+ border:0;
+ margin:4px
 }
 button{
- background:#a8f0a0;color:#17231f;font-weight:bold;
+ background:#a8f0a0;
+ color:#17231f;
+ font-weight:bold;
  cursor:pointer
 }
+button:disabled{opacity:.55}
 input{
- width:145px;max-width:45%;background:#fff
+ width:180px;
+ max-width:90%;
+ background:#fff
 }
-#status{color:#ffe28a;min-height:28px;overflow-wrap:anywhere}
+#status{
+ color:#ffe28a;
+ min-height:28px;
+ overflow-wrap:anywhere
+}
 #roomCodeDisplay{
- font-size:30px;letter-spacing:5px;color:#a8f0a0
+ font-size:30px;
+ letter-spacing:5px;
+ color:#a8f0a0;
+ font-weight:bold
 }
 #qrCode{
- display:flex;justify-content:center;align-items:center;
- margin:12px auto;min-height:0
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ margin:12px auto
 }
 #qrCode img,#qrCode canvas{
- margin:auto;border:8px solid white;border-radius:4px
+ margin:auto;
+ border:8px solid white;
+ border-radius:4px
 }
-canvas#game{
- display:block;width:100%;height:auto;
- border:3px solid #a8f0a0;border-radius:10px;
- background:#6ebd66;touch-action:none
+#game{
+ display:block;
+ width:100%;
+ height:auto;
+ border:3px solid #a8f0a0;
+ border-radius:10px;
+ background:#6ebd66;
+ touch-action:none
 }
 .controls{
- display:grid;grid-template-columns:repeat(3,60px);
- justify-content:center;gap:5px;margin:12px
+ display:grid;
+ grid-template-columns:repeat(3,60px);
+ justify-content:center;
+ gap:5px;
+ margin:12px
 }
-.controls button{height:52px;font-size:22px;margin:0}
-.small{font-size:13px;color:#c9d8d0}
+.controls button{
+ height:52px;
+ font-size:22px;
+ margin:0;
+ touch-action:none
+}
+.small{
+ font-size:13px;
+ color:#c9d8d0
+}
+hr{
+ border:0;
+ border-top:1px solid #40564a;
+ margin:18px 0
+}
 </style>
 </head>
 
 <body>
 <main>
 <h2>🌳 像素冒險 Online</h2>
-<p>建立房間，邀請朋友一起冒險！</p>
+<p>和朋友一起進入像素世界冒險！</p>
+
+<p>你的冒險者名稱：</p>
+<input id="playerName"
+ placeholder="例如：勇者小明"
+ maxlength="12"
+ autocomplete="off"
+ value="">
 
 <div>
  <button id="hostBtn">建立房間</button>
@@ -67,14 +121,17 @@ canvas#game{
 <div id="roomCodeDisplay">----</div>
 
 <div id="qrCode"></div>
-<p class="small">朋友掃描 QR Code 開啟遊戲，再按加入房間。</p>
+<p class="small">朋友掃描 QR Code，就能自動填入房間代碼。</p>
 <button id="copyBtn">複製房間代碼</button>
 
-<hr style="border-color:#40564a;margin:18px 0">
+<hr>
 
 <p>輸入朋友的四位房間代碼：</p>
-<input id="room" placeholder="例如 A7K2"
- maxlength="4" autocomplete="off" autocapitalize="characters">
+<input id="room"
+ placeholder="例如：A7K2"
+ maxlength="4"
+ autocomplete="off"
+ autocapitalize="characters">
 <button id="joinBtn">加入房間</button>
 
 <p id="status">尚未連線</p>
@@ -88,18 +145,28 @@ canvas#game{
  <button data-dir="right">▶</button>
 </div>
 
-<p class="small">電腦：方向鍵或 WASD　手機：按住方向鍵移動</p>
-<p class="small">房主必須保持遊戲開啟。網路連線需正常才能一起遊玩。</p>
+<p class="small">電腦：方向鍵或 WASD</p>
+<p class="small">手機：按住方向鍵移動</p>
+<p class="small">房主必須保持遊戲開啟，其他玩家才能繼續連線。</p>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const canvas = $("game");
 const ctx = canvas.getContext("2d");
-const W = 480, H = 360;
 
-// 每個四位房間碼對應一個 PeerJS ID
+const W = 480;
+const H = 360;
 const ROOM_PREFIX = "pixel-rpg-";
+
+const colors = [
+ "#ffdc62",
+ "#ff8b83",
+ "#8bd7ff",
+ "#d8a0ff",
+ "#ffffff",
+ "#ffa85c"
+];
 
 let peer = null;
 let host = false;
@@ -107,77 +174,91 @@ let hostConn = null;
 let conns = [];
 let players = {};
 let myId = "";
+let myName = "";
 let roomCode = "";
-let x = 100, y = 100;
-let keys = {}, touch = {};
+let x = 100;
+let y = 100;
+let keys = {};
+let touch = {};
 let lastSend = 0;
 let joining = false;
+let gameStarted = false;
 
-const colors = [
- "#ffdc62","#ff8b83","#8bd7ff",
- "#d8a0ff","#ffffff","#ffa85c"
-];
-
-function say(s) {
- $("status").textContent = s;
+function say(message){
+ $("status").textContent = message;
 }
 
-function generateRoomCode() {
+function getPlayerName(){
+ const name = $("playerName").value.trim();
+ return (name || "冒險者").slice(0,12);
+}
+
+function generateRoomCode(){
  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
  let code = "";
- for (let i = 0; i < 4; i++) {
-  code += chars[Math.floor(Math.random() * chars.length)];
+
+ for(let i=0;i<4;i++){
+  code += chars[Math.floor(Math.random()*chars.length)];
  }
+
  return code;
 }
 
-function showRoomCode(code) {
+function showRoomCode(code){
  $("roomCodeDisplay").textContent = code;
 
  const qr = $("qrCode");
  qr.innerHTML = "";
 
- // QR Code 包含遊戲網址及房間碼
  const inviteUrl =
   location.origin + location.pathname + "?room=" + code;
 
- if (typeof QRCode === "undefined") {
+ if(typeof QRCode === "undefined"){
   say("QR Code 載入失敗，請重新整理頁面。");
   return;
  }
 
- new QRCode(qr, {
-  text: inviteUrl,
-  width: 200,
-  height: 200,
-  colorDark: "#17231f",
-  colorLight: "#ffffff",
-  correctLevel: QRCode.CorrectLevel.M
+ new QRCode(qr,{
+  text:inviteUrl,
+  width:200,
+  height:200,
+  colorDark:"#17231f",
+  colorLight:"#ffffff",
+  correctLevel:QRCode.CorrectLevel.M
  });
 }
 
-function newPlayer(id, px, py) {
+function newPlayer(id,px,py,name){
+ const colorIndex = Object.keys(players).length % colors.length;
+
  return {
-  x: px,
-  y: py,
-  color: colors[Object.keys(players).length % colors.length]
+  x:px,
+  y:py,
+  name:name || "冒險者",
+  color:colors[colorIndex]
  };
 }
 
-function startHostRoom() {
- if (peer) {
+function destroyCurrentPeer(){
+ if(peer){
   peer.destroy();
   peer = null;
  }
-
- host = true;
- joining = false;
  hostConn = null;
  conns = [];
  players = {};
+ myId = "";
+}
+
+function startHostRoom(){
+ destroyCurrentPeer();
+
+ host = true;
+ joining = false;
+ gameStarted = false;
+ myName = getPlayerName();
  x = 100;
  y = 100;
- myId = "";
 
  $("hostBtn").disabled = true;
  $("joinBtn").disabled = false;
@@ -186,9 +267,10 @@ function startHostRoom() {
 
  let attempts = 0;
 
- function createPeerWithCode() {
+ function createPeerWithCode(){
   attempts++;
-  if (attempts > 15) {
+
+  if(attempts > 15){
    $("hostBtn").disabled = false;
    say("暫時無法建立房間，請再試一次。");
    return;
@@ -199,38 +281,44 @@ function startHostRoom() {
 
   peer = new Peer(ROOM_PREFIX + roomCode);
 
-  peer.on("open", id => {
+  peer.on("open",id=>{
    myId = id;
+
    players = {};
    players[myId] = {
-    x, y, color: colors[0]
+    x:x,
+    y:y,
+    name:myName,
+    color:colors[0]
    };
 
+   gameStarted = true;
    showRoomCode(roomCode);
-   say("房間已建立！把代碼或 QR Code 分享給朋友。");
+
+   say("房間建立成功！分享代碼或 QR Code 邀請朋友。");
    $("hostBtn").disabled = false;
   });
 
-  peer.on("connection", conn => {
-   if (!host) {
+  peer.on("connection",conn=>{
+   if(!host){
     conn.close();
     return;
    }
+
    setupHostConnection(conn);
   });
 
-  peer.on("error", e => {
-   console.error("PeerJS error:", e);
+  peer.on("error",e=>{
+   console.error("PeerJS error:",e);
 
-   if (e.type === "unavailable-id") {
-    // 房間碼被其他人使用，換一組再試
-    if (peer) {
+   if(e.type === "unavailable-id"){
+    if(peer){
      peer.destroy();
      peer = null;
     }
     createPeerWithCode();
-   } else {
-    say("連線錯誤：" + e.type + "。請重新建立房間。");
+   }else{
+    say("建立房間失敗：" + e.type + "，請再試一次。");
     $("hostBtn").disabled = false;
    }
   });
@@ -239,292 +327,367 @@ function startHostRoom() {
  createPeerWithCode();
 }
 
-function setupHostConnection(conn) {
- if (conns.some(c => c.peer === conn.peer)) return;
+function setupHostConnection(conn){
+ if(conns.some(c=>c.peer === conn.peer)) return;
 
  conns.push(conn);
 
- conn.on("open", () => {
-  players[conn.peer] = newPlayer(conn.peer, 240, 180);
+ conn.on("open",()=>{
+  players[conn.peer] = newPlayer(
+   conn.peer,
+   240,
+   180,
+   "冒險者"
+  );
 
   conn.send({
-   type: "welcome",
-   players
+   type:"welcome",
+   players:players
   });
 
-  say("有玩家加入！目前 " + (conns.length + 1) + " 人");
+  say("有玩家加入！目前 " + (conns.length + 1) + " 人。");
  });
 
- conn.on("data", msg => {
-  if (!msg || typeof msg !== "object") return;
+ conn.on("data",msg=>{
+  if(!msg || typeof msg !== "object") return;
 
-  if (msg.type === "pos" && players[conn.peer]) {
-   // 避免不合法座標
-   if (Number.isFinite(msg.x) && Number.isFinite(msg.y)) {
-    players[conn.peer].x = Math.max(12, Math.min(W - 12, msg.x));
-    players[conn.peer].y = Math.max(12, Math.min(H - 12, msg.y));
+  if(!players[conn.peer]) return;
+
+  if(msg.type === "name"){
+   players[conn.peer].name =
+    String(msg.name || "冒險者").slice(0,12);
+  }
+
+  if(msg.type === "pos"){
+   if(Number.isFinite(msg.x) && Number.isFinite(msg.y)){
+    players[conn.peer].x =
+     Math.max(12,Math.min(W-12,msg.x));
+
+    players[conn.peer].y =
+     Math.max(12,Math.min(H-12,msg.y));
+   }
+
+   if(typeof msg.name === "string"){
+    players[conn.peer].name =
+     msg.name.slice(0,12) || "冒險者";
    }
   }
  });
 
- conn.on("close", () => {
+ conn.on("close",()=>{
   delete players[conn.peer];
-  conns = conns.filter(c => c !== conn);
+  conns = conns.filter(c=>c !== conn);
   say("有玩家離開房間。");
  });
 
- conn.on("error", e => {
-  console.error("玩家連線錯誤：", e);
+ conn.on("error",e=>{
+  console.error("玩家連線錯誤：",e);
  });
 }
 
-$("hostBtn").onclick = () => {
- startHostRoom();
-};
-
-$("joinBtn").onclick = () => {
+function joinRoom(){
  const code = $("room").value.trim().toUpperCase();
 
- if (!/^[A-Z0-9]{4}$/.test(code)) {
-  say("請輸入四位英數字房間碼。");
+ if(!/^[A-Z0-9]{4}$/.test(code)){
+  say("請輸入四位英數字房間代碼。");
   return;
  }
 
- if (peer) {
-  peer.destroy();
-  peer = null;
- }
+ destroyCurrentPeer();
 
  host = false;
  joining = true;
- hostConn = null;
- conns = [];
- players = {};
- myId = "";
+ gameStarted = false;
+ myName = getPlayerName();
  roomCode = code;
+ x = 100;
+ y = 100;
 
  $("room").value = code;
  $("joinBtn").disabled = true;
+ $("hostBtn").disabled = false;
+
  say("正在加入房間 " + code + " ...");
+
+ let connected = false;
 
  peer = new Peer();
 
- peer.on("open", id => {
+ peer.on("open",id=>{
   myId = id;
-  hostConn = peer.connect(ROOM_PREFIX + code, {
-   reliable: true
+
+  hostConn = peer.connect(ROOM_PREFIX + code,{
+   reliable:true
   });
 
-  let gotWelcome = false;
+  hostConn.on("open",()=>{
+   connected = true;
 
-  hostConn.on("open", () => {
-   say("已連線，正在取得玩家資料...");
+   hostConn.send({
+    type:"name",
+    name:myName
+   });
+
+   say("已連線，正在同步玩家資料...");
   });
 
-  hostConn.on("data", msg => {
-   if (!msg || typeof msg !== "object") return;
+  hostConn.on("data",msg=>{
+   if(!msg || typeof msg !== "object") return;
 
-   if (msg.type === "welcome" || msg.type === "state") {
-    if (msg.players && typeof msg.players === "object") {
-     players = msg.players;
-     gotWelcome = true;
+   if((msg.type === "welcome" || msg.type === "state")
+      && msg.players && typeof msg.players === "object"){
 
-     if (msg.type === "welcome") {
-      say("加入成功！開始冒險吧！");
-     }
+    players = msg.players;
+    gameStarted = true;
+    joining = false;
+
+    if(msg.type === "welcome"){
+     say("加入成功！開始冒險吧！");
     }
    }
   });
 
-  hostConn.on("close", () => {
+  hostConn.on("close",()=>{
+   gameStarted = false;
+   joining = false;
+   $("joinBtn").disabled = false;
    say("與房主的連線已中斷。");
-   $("joinBtn").disabled = false;
   });
 
-  hostConn.on("error", e => {
-   console.error("Host connection error:", e);
-   say("連線失敗，請確認房間碼及房主是否在線。");
+  hostConn.on("error",e=>{
+   console.error("Host connection error:",e);
+   say("連線失敗，請確認房間碼和房主是否在線。");
    $("joinBtn").disabled = false;
   });
-
-  // 若連線已打開但一直沒有收到房間資料，
-  // 交由狀態同步或錯誤訊息繼續處理。
  });
 
- peer.on("error", e => {
-  console.error("PeerJS error:", e);
-  say("加入失敗：" + e.type + "。請確認房間碼及網路。");
-  $("joinBtn").disabled = false;
- });
+ peer.on("error",e=>{
+  console.error("PeerJS error:",e);
 
- // 確保連線失敗時不會一直鎖住按鈕
- setTimeout(() => {
-  if (joining && (!hostConn || !hostConn.open)) {
+  if(!connected){
+   say("加入失敗：" + e.type + "。請確認房間碼和網路。");
+   joining = false;
    $("joinBtn").disabled = false;
   }
- }, 12000);
+ });
+
+ setTimeout(()=>{
+  if(joining && !gameStarted){
+   joining = false;
+   $("joinBtn").disabled = false;
+   say("連線逾時，請確認房主在線及房間碼正確。");
+  }
+ },15000);
+}
+
+$("hostBtn").onclick = ()=>{
+ startHostRoom();
 };
 
-$("copyBtn").onclick = async () => {
- if (!roomCode || !host) {
-  say("請先建立房間，才能複製房間代碼。");
+$("joinBtn").onclick = ()=>{
+ joinRoom();
+};
+
+$("copyBtn").onclick = async()=>{
+ if(!roomCode || !host || !gameStarted){
+  say("請先建立房間，再複製房間代碼。");
   return;
  }
 
- try {
+ try{
   await navigator.clipboard.writeText(roomCode);
   say("房間代碼 " + roomCode + " 已複製！");
- } catch (e) {
-  // 部分手機或非 HTTPS 環境不允許剪貼簿操作
+ }catch(e){
   $("room").value = roomCode;
+  $("room").focus();
   $("room").select();
-  say("請複製選取的房間代碼：" + roomCode);
+  say("已把代碼放進輸入框，請長按複製。");
  }
 };
 
-function move(dx, dy) {
- x = Math.max(12, Math.min(W - 12, x + dx));
- y = Math.max(12, Math.min(H - 12, y + dy));
+function move(dx,dy){
+ x = Math.max(12,Math.min(W-12,x+dx));
+ y = Math.max(12,Math.min(H-12,y+dy));
 }
 
-function loop(t) {
- let dx = 0, dy = 0;
+function loop(t){
+ let dx = 0;
+ let dy = 0;
 
- if (keys.ArrowUp || keys.w || keys.W || touch.up) dy = -2.5;
- if (keys.ArrowDown || keys.s || keys.S || touch.down) dy = 2.5;
- if (keys.ArrowLeft || keys.a || keys.A || touch.left) dx = -2.5;
- if (keys.ArrowRight || keys.d || keys.D || touch.right) dx = 2.5;
+ if(keys.ArrowUp || keys.w || keys.W || touch.up) dy = -2.5;
+ if(keys.ArrowDown || keys.s || keys.S || touch.down) dy = 2.5;
+ if(keys.ArrowLeft || keys.a || keys.A || touch.left) dx = -2.5;
+ if(keys.ArrowRight || keys.d || keys.D || touch.right) dx = 2.5;
 
- if (dx && dy) {
+ if(dx && dy){
   dx *= 0.707;
   dy *= 0.707;
  }
 
- move(dx, dy);
+ move(dx,dy);
 
- if (host && peer && peer.open) {
+ if(host && peer && peer.open && gameStarted){
   players[myId] = {
-   x, y, color: colors[0]
+   x:x,
+   y:y,
+   name:myName,
+   color:colors[0]
   };
 
-  if (t - lastSend > 100) {
-   conns.forEach(c => {
-    if (c.open) {
-     c.send({ type: "state", players });
+  if(t-lastSend > 100){
+   conns.forEach(c=>{
+    if(c.open){
+     c.send({
+      type:"state",
+      players:players
+     });
     }
    });
+
    lastSend = t;
   }
- } else if (hostConn && hostConn.open && t - lastSend > 70) {
-  hostConn.send({ type: "pos", x, y });
-  lastSend = t;
+ }else if(!host && hostConn && hostConn.open && gameStarted){
+  if(t-lastSend > 70){
+   hostConn.send({
+    type:"pos",
+    x:x,
+    y:y,
+    name:myName
+   });
+
+   lastSend = t;
+  }
  }
 
  draw();
  requestAnimationFrame(loop);
 }
 
-function draw() {
- ctx.clearRect(0, 0, W, H);
+function draw(){
+ ctx.clearRect(0,0,W,H);
 
+ // 草地
  ctx.fillStyle = "#75c86a";
- ctx.fillRect(0, 0, W, H);
+ ctx.fillRect(0,0,W,H);
 
  ctx.fillStyle = "#61b45b";
- for (let i = 0; i < 12; i++) {
-  for (let j = 0; j < 9; j++) {
-   if ((i * 7 + j * 3) % 4 === 0) {
-    ctx.fillRect(i * 40 + 4, j * 40 + 4, 20, 14);
+
+ for(let i=0;i<12;i++){
+  for(let j=0;j<9;j++){
+   if((i*7+j*3)%4===0){
+    ctx.fillRect(i*40+4,j*40+4,20,14);
    }
   }
  }
 
  // 小路
  ctx.fillStyle = "#d9c48a";
- ctx.fillRect(0, 275, W, 34);
- ctx.fillRect(215, 0, 34, H);
+ ctx.fillRect(0,275,W,34);
+ ctx.fillRect(215,0,34,H);
 
  // 樹木
- for (const [tx, ty] of [[45,45],[420,65],[400,230],[65,210]]) {
+ for(const [tx,ty] of [
+  [45,45],[420,65],[400,230],[65,210]
+ ]){
   ctx.fillStyle = "#704b30";
-  ctx.fillRect(tx + 10, ty + 15, 8, 17);
+  ctx.fillRect(tx+10,ty+15,8,17);
+
   ctx.fillStyle = "#277d43";
   ctx.beginPath();
-  ctx.arc(tx + 14, ty + 12, 15, 0, Math.PI * 2);
+  ctx.arc(tx+14,ty+12,15,0,Math.PI*2);
   ctx.fill();
  }
 
  // 其他玩家
- for (const [id, p] of Object.entries(players)) {
-  if (id === myId) continue;
+ for(const [id,p] of Object.entries(players)){
+  if(id === myId) continue;
 
-  character(p.x, p.y, p.color || "#ff8b83");
+  character(p.x,p.y,p.color || "#ff8b83");
+
   ctx.fillStyle = "#fff";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("朋友", p.x, p.y - 19);
+  ctx.fillText(
+   String(p.name || "冒險者").slice(0,12),
+   p.x,
+   p.y-19
+  );
  }
 
- character(x, y, colors[0]);
+ // 自己的角色
+ character(x,y,colors[0]);
+
  ctx.fillStyle = "#17351d";
  ctx.font = "bold 12px sans-serif";
  ctx.textAlign = "center";
- ctx.fillText("你", x, y - 19);
+ ctx.fillText(
+  (myName || "你").slice(0,12),
+  x,
+  y-19
+ );
 }
 
-function character(px, py, color) {
+function character(px,py,color){
  ctx.fillStyle = "#31543a";
- ctx.fillRect(px - 9, py + 7, 18, 5);
+ ctx.fillRect(px-9,py+7,18,5);
 
  ctx.fillStyle = color;
- ctx.fillRect(px - 9, py - 10, 18, 18);
+ ctx.fillRect(px-9,py-10,18,18);
 
  ctx.fillStyle = "#fff";
- ctx.fillRect(px - 5, py - 5, 4, 4);
- ctx.fillRect(px + 2, py - 5, 4, 4);
+ ctx.fillRect(px-5,py-5,4,4);
+ ctx.fillRect(px+2,py-5,4,4);
 
  ctx.fillStyle = "#69432d";
- ctx.fillRect(px - 7, py + 8, 5, 7);
- ctx.fillRect(px + 2, py + 8, 5, 7);
+ ctx.fillRect(px-7,py+8,5,7);
+ ctx.fillRect(px+2,py+8,5,7);
 }
 
-// 掃描邀請 QR Code 後，自動填入房間碼
+// 掃描 QR Code 後自動填入房間碼
 const params = new URLSearchParams(location.search);
 const invitedRoom = params.get("room");
 
-if (invitedRoom && /^[A-Z0-9]{4}$/i.test(invitedRoom)) {
+if(invitedRoom && /^[A-Z0-9]{4}$/i.test(invitedRoom)){
  $("room").value = invitedRoom.toUpperCase();
- say("已填入邀請房間碼，按「加入房間」即可。");
+ say("已填入邀請房間碼，輸入名稱後按「加入房間」。");
 }
 
-document.addEventListener("keydown", e => {
- if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) {
+// 電腦鍵盤控制
+document.addEventListener("keydown",e=>{
+ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)){
   e.preventDefault();
  }
+
  keys[e.key] = true;
 });
 
-document.addEventListener("keyup", e => {
+document.addEventListener("keyup",e=>{
  keys[e.key] = false;
 });
 
-document.querySelectorAll("[data-dir]").forEach(btn => {
+window.addEventListener("blur",()=>{
+ keys = {};
+ touch = {};
+});
+
+// 手機觸控方向鍵
+document.querySelectorAll("[data-dir]").forEach(btn=>{
  const d = btn.dataset.dir;
 
- const on = e => {
+ const on = e=>{
   e.preventDefault();
   touch[d] = true;
  };
 
- const off = e => {
+ const off = e=>{
   e.preventDefault();
   touch[d] = false;
  };
 
- btn.addEventListener("pointerdown", on);
- btn.addEventListener("pointerup", off);
- btn.addEventListener("pointercancel", off);
- btn.addEventListener("pointerleave", off);
+ btn.addEventListener("pointerdown",on);
+ btn.addEventListener("pointerup",off);
+ btn.addEventListener("pointercancel",off);
+ btn.addEventListener("pointerleave",off);
 });
 
 requestAnimationFrame(loop);
